@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="SHEELEARN Dashboard">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @php $favicon = asset('favicon.svg').'?v='.filemtime(public_path('favicon.svg')); @endphp
+    <link rel="icon" href="{{ $favicon }}" type="image/svg+xml">
+    <link rel="shortcut icon" href="{{ $favicon }}" type="image/svg+xml">
     <title>@yield('title', 'Dashboard') — SHEELEARN</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

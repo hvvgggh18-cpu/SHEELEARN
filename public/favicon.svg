@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="SHEELEARN logo">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="#020617"/>
+  <path d="M76 68h104a20 20 0 0 1 20 20v46c0 24-18 38-38 48l-24 12-24-12c-20-10-38-24-38-48V88a20 20 0 0 1 20-20Z" fill="url(#g)"/>
+  <path d="M102 104h52a12 12 0 0 1 0 24h-36a12 12 0 0 0 0 24h36a12 12 0 0 1 0 24h-52a12 12 0 0 1 0-24h36a12 12 0 0 0 0-24h-36a12 12 0 0 1 0-24Z" fill="#f8fafc"/>
+</svg>
