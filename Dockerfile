@@ -1,24 +1,36 @@
 FROM php:8.3-fpm
 
-# Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LANGUAGE=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV COMPOSER_ALLOW_SUPERUSER=1
+ENV COMPOSER_HOME=/tmp/composer
+ENV COMPOSER_MEMORY_LIMIT=-1
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends apt-utils; \
+    apt-get install -y --no-install-recommends \
         ca-certificates apt-transport-https gnupg2 lsb-release \
+        locales locales-all \
         build-essential pkg-config \
         git unzip zip curl \
         libpng-dev \
+        libpng-tools \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
         libzip-dev zlib1g-dev \
         libonig-dev libxml2-dev \
         libgcrypt20 libgpg-error-dev libgpm2 \
         nginx supervisor \
-    && docker-php-ext-configure gd --with-jpeg --with-freetype \
-    && docker-php-ext-install -j"$(nproc)" pdo pdo_mysql zip gd bcmath mbstring pcntl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    ; \
+    docker-php-ext-configure gd --with-jpeg --with-freetype; \
+    docker-php-ext-install -j"$(nproc)" pdo pdo_mysql zip gd bcmath mbstring pcntl; \
+    # remove build deps to slim image
+    apt-get purge -y --auto-remove build-essential pkg-config; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -26,7 +38,8 @@ WORKDIR /var/www
 
 # Copy composer files first to leverage Docker layer cache
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+# Install PHP dependencies but do not run Composer scripts during image build
+RUN composer --version && composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts --classmap-authoritative || true
 
 # Copy application files
 COPY . .

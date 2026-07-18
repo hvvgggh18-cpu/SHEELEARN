@@ -22,6 +22,14 @@ if [ -f artisan ]; then
   php artisan key:generate --force || true
 fi
 
+# Run Composer autoload and package discovery at container startup (after .env and APP_KEY exist)
+if [ -f composer.json ]; then
+  composer dump-autoload --optimize --no-interaction || true
+  if [ -f artisan ]; then
+    php artisan package:discover --ansi || true
+  fi
+fi
+
 # Optionally run migrations
 if [ "${RUN_MIGRATIONS}" = "true" ] && [ -f artisan ]; then
   php artisan migrate --force || true
