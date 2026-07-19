@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\EmailOtp;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -29,11 +29,14 @@ class PasswordResetFlowTest extends TestCase
 
         $response->assertStatus(200)->assertJsonPath('success', true);
 
-        $emailOtp = EmailOtp::where('email', 'reset@example.com')->first();
+        $cacheKey = 'password_reset_otp:reset@example.com';
+        $emailOtp = Cache::get($cacheKey);
         $this->assertNotNull($emailOtp);
 
         $testOtp = '654321';
-        $emailOtp->update(['otp_hash' => Hash::make($testOtp), 'attempt_count' => 0]);
+        $emailOtp['otp_hash'] = Hash::make($testOtp);
+        $emailOtp['attempt_count'] = 0;
+        Cache::put($cacheKey, $emailOtp, now()->addMinutes(10));
 
         $verify = $this->postJson('/api/auth/password-reset/verify', [
             'email' => 'reset@example.com',

@@ -298,47 +298,23 @@
                 <div id="authGmailPanel" class="auth-panel relative z-10" style="display:none">
                     <div class="flex items-center justify-center gap-2.5 mb-6">
                         <div class="w-10 h-10 rounded-xl bg-cy/10 border border-cy/10 flex items-center justify-center shadow-lg shadow-cy/10 relative">
-                            <i class="fa-solid fa-envelope text-cy text-sm"></i>
+                            <i class="fa-brands fa-google text-cy text-sm"></i>
                         </div>
                     </div>
                     <div class="flex items-center justify-center gap-2 mb-4 text-[10px] uppercase tracking-[.25em] text-c-25">
                         <span class="px-2 py-1 rounded-full bg-cy/10 text-cy">1. Google</span>
                         <i class="fa-solid fa-arrow-right text-c-15"></i>
-                        <span class="px-2 py-1 rounded-full bg-cy/10 text-cy">2. OTP</span>
-                        <i class="fa-solid fa-arrow-right text-c-15"></i>
-                        <span class="px-2 py-1 rounded-full bg-cy/10 text-cy">3. Profile</span>
+                        <span class="px-2 py-1 rounded-full bg-cy/10 text-cy">2. Profile</span>
                     </div>
-                    <h2 class="text-2xl font-black text-c text-center mb-2 uppercase tracking-wide">Verify your Gmail</h2>
-                    <p id="gmailPanelSubtitle" class="text-sm text-c-25 text-center mb-6">We’ll send a secure verification code to the Gmail account you choose.</p>
-                    <form id="gmailStartForm" onsubmit="submitGoogleOtpStart(event)" novalidate>
-                        <div class="space-y-4">
-                            <div class="rounded-2xl border border-cy/10 bg-cy/5 p-4 text-sm text-c-25">
-                                <div class="flex items-center justify-between gap-3">
-                                    <span id="gmailPreviewEmail" class="font-medium text-c">Checking Google account…</span>
-                                    <i class="fa-solid fa-shield-halved text-cy"></i>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn-cy w-full text-xs font-bold px-6 py-3.5 rounded-xl uppercase tracking-wider">
-                                Send verification code
-                            </button>
+                    <h2 class="text-2xl font-black text-c text-center mb-2 uppercase tracking-wide">Complete your profile</h2>
+                    <p id="gmailPanelSubtitle" class="text-sm text-c-25 text-center mb-6">Finish setting up your SHEELEARN account after signing in with Google.</p>
+                    <div class="rounded-2xl border border-cy/10 bg-cy/5 p-4 text-sm text-c-25 mb-6">
+                        <div class="flex items-center justify-between gap-3">
+                            <span id="gmailPreviewEmail" class="font-medium text-c">Checking Google account…</span>
+                            <i class="fa-solid fa-user-check text-cy"></i>
                         </div>
-                    </form>
-                    <form id="gmailVerifyForm" onsubmit="submitGoogleOtpVerify(event)" class="space-y-4 mt-6" style="display:none" novalidate>
-                        <div>
-                            <label for="gmailOtp" class="block text-[10px] font-bold text-c-40 uppercase tracking-[.15em] font-mono mb-2">Verification Code</label>
-                            <div class="relative">
-                                <i class="fa-solid fa-key absolute left-3.5 top-1/2 -translate-y-1/2 text-c-15 text-xs"></i>
-                                <input id="gmailOtp" name="otp" type="text" maxlength="6" class="auth-input w-full pl-10 pr-4 py-3 rounded-xl text-sm font-mono" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" required>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn-cy w-full text-xs font-bold px-6 py-3.5 rounded-xl uppercase tracking-wider">
-                            Verify code
-                        </button>
-                        <button type="button" id="gmailResendBtn" class="btn-g w-full text-xs font-bold px-6 py-3.5 rounded-xl uppercase tracking-wider" onclick="resendGoogleOtp()">
-                            Resend code
-                        </button>
-                    </form>
-                    <form id="gmailProfileForm" onsubmit="submitGoogleProfile(event)" class="space-y-4 mt-6" style="display:none" novalidate>
+                    </div>
+                    <form id="gmailProfileForm" onsubmit="submitGoogleProfile(event)" class="space-y-4" novalidate>
                         <div>
                             <label for="gmailProfileName" class="block text-[10px] font-bold text-c-40 uppercase tracking-[.15em] font-mono mb-2">Full Name</label>
                             <div class="relative mb-3">
@@ -1091,134 +1067,11 @@ function handleOAuthGoogle() {
 
 function showGoogleFlow(email, name) {
     document.getElementById('gmailPreviewEmail').textContent = email || 'Google account selected';
-    document.getElementById('gmailPanelSubtitle').textContent = 'We’ve prepared your Google account for a secure verification step.';
-    const startForm = document.getElementById('gmailStartForm');
-    const verifyForm = document.getElementById('gmailVerifyForm');
+    document.getElementById('gmailPanelSubtitle').textContent = 'Finish setting up your SHEELEARN account after Google login.';
     const profileForm = document.getElementById('gmailProfileForm');
-    startForm.style.display = 'block';
-    verifyForm.style.display = 'none';
-    profileForm.style.display = 'none';
+    profileForm.style.display = 'block';
+    document.getElementById('gmailProfileName').value = name || '';
     openAuth('gmail');
-}
-
-function submitGoogleOtpStart(event) {
-    event.preventDefault();
-    const form = event.target;
-    toggleSubmitState(form, true);
-    hidePanelErrors(form);
-
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    fetch('/api/auth/google/otp/send', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            form.style.display = 'none';
-            const verifyForm = document.getElementById('gmailVerifyForm');
-            verifyForm.style.display = 'block';
-            showPanelMessage(verifyForm, result.message);
-            startResendCooldown();
-        } else {
-            showPanelError(form, result.message, result.errors);
-        }
-    })
-    .catch(() => showPanelError(form, 'Unable to send verification code.'))
-    .finally(() => toggleSubmitState(form, false));
-}
-
-let resendCooldownTimer = null;
-let resendCooldownRemaining = 0;
-
-function startResendCooldown() {
-    resendCooldownRemaining = 60;
-    const resendBtn = document.getElementById('gmailResendBtn');
-    if (resendBtn) {
-        resendBtn.disabled = true;
-        resendBtn.textContent = 'Resend code (60s)';
-    }
-
-    if (resendCooldownTimer) clearInterval(resendCooldownTimer);
-    
-    resendCooldownTimer = setInterval(() => {
-        resendCooldownRemaining--;
-        if (resendBtn) {
-            resendBtn.textContent = `Resend code (${resendCooldownRemaining}s)`;
-        }
-        if (resendCooldownRemaining <= 0) {
-            clearInterval(resendCooldownTimer);
-            if (resendBtn) {
-                resendBtn.disabled = false;
-                resendBtn.textContent = 'Resend code';
-            }
-        }
-    }, 1000);
-}
-
-function resendGoogleOtp() {
-    if (resendCooldownRemaining > 0) return;
-    
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    const verifyForm = document.getElementById('gmailVerifyForm');
-    
-    fetch('/api/auth/google/otp/send', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            showPanelMessage(verifyForm, result.message);
-            document.getElementById('gmailOtp').value = '';
-            startResendCooldown();
-        } else {
-            showPanelError(verifyForm, result.message, result.errors);
-        }
-    })
-    .catch(() => showPanelError(verifyForm, 'Unable to resend verification code.'));
-}
-
-function submitGoogleOtpVerify(event) {
-    event.preventDefault();
-    const form = event.target;
-    toggleSubmitState(form, true);
-    hidePanelErrors(form);
-
-    const otp = form.otp.value.trim();
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    fetch('/api/auth/google/otp/verify', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-        body: JSON.stringify({ otp }),
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            form.style.display = 'none';
-            const profileForm = document.getElementById('gmailProfileForm');
-            profileForm.style.display = 'block';
-            showPanelMessage(profileForm, result.message);
-        } else {
-            showPanelError(form, result.message, result.errors);
-        }
-    })
-    .catch(() => showPanelError(form, 'Unable to verify code.'))
-    .finally(() => toggleSubmitState(form, false));
 }
 
 function submitGoogleProfile(event) {
@@ -1282,111 +1135,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-function submitGmailStart(event) {
-    event.preventDefault();
-    const form = event.target;
-    toggleSubmitState(form, true);
-    hidePanelErrors(form);
 
-    const email = form.email.value.trim();
-    const name = form.name ? form.name.value.trim() : '';
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    fetch('/api/auth/gmail/start', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-        body: JSON.stringify({ email, name }),
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            document.getElementById('verifyGmailHidden').value = email;
-            form.style.display = 'none';
-            const verifyForm = document.getElementById('gmailVerifyForm');
-            verifyForm.style.display = 'block';
-            let message = result.message;
-            if (result.debug_code) {
-                message += ' Use code ' + result.debug_code + ' to verify your email.';
-            }
-            showPanelMessage(verifyForm, message);
-        } else {
-            showPanelError(form, result.message, result.errors);
-        }
-    })
-    .catch(() => showPanelError(form, 'Unable to send verification code.'))
-    .finally(() => toggleSubmitState(form, false));
-}
-
-function submitGmailVerify(event) {
-    event.preventDefault();
-    const form = event.target;
-    toggleSubmitState(form, true);
-    hidePanelErrors(form);
-
-    const email = form.email.value.trim();
-    const otp = form.otp.value.trim();
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    fetch('/api/auth/gmail/verify', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-        body: JSON.stringify({ email, otp }),
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            document.getElementById('gmailProfileName').value = document.getElementById('gmailName').value.trim();
-            form.style.display = 'none';
-            const profileForm = document.getElementById('gmailProfileForm');
-            profileForm.style.display = 'block';
-            showPanelMessage(profileForm, result.message);
-        } else {
-            showPanelError(form, result.message, result.errors);
-        }
-    })
-    .catch(() => showPanelError(form, 'Unable to verify code.'))
-    .finally(() => toggleSubmitState(form, false));
-}
-
-function submitGmailProfile(event) {
-    event.preventDefault();
-    const form = event.target;
-    toggleSubmitState(form, true);
-    hidePanelErrors(form);
-
-    const email = document.getElementById('verifyGmailHidden').value.trim();
-    const name = form.name.value.trim();
-    const goal = form.goal.value.trim();
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    fetch('/api/auth/gmail/complete', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-        body: JSON.stringify({ email, name, goal }),
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            window.location.href = result.redirect || '/dashboard';
-        } else {
-            showPanelError(form, result.message, result.errors);
-        }
-    })
-    .catch(() => showPanelError(form, 'Unable to finish creating your account.'))
-    .finally(() => toggleSubmitState(form, false));
-}
 
 function submitPhoneRequest(event) {
     event.preventDefault();
@@ -1490,66 +1239,11 @@ function submitEmailRequest(event) {
     const email = form.email.value.trim();
     const name = form.name ? form.name.value.trim() : '';
     const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    fetch('/api/auth/email-otp/request', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-        body: JSON.stringify({ email, name }),
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            document.getElementById('verifyEmailHidden').value = email;
-            form.style.display = 'none';
-            const verifyForm = document.getElementById('emailVerifyForm');
-            verifyForm.style.display = 'block';
-            let message = result.message;
-            if (result.debug_code) {
-                message += ' Use code ' + result.debug_code + ' to verify your email while email delivery is not configured.';
-            }
-            showPanelMessage(verifyForm, message);
-        } else {
-            showPanelError(form, result.message, result.errors);
-        }
-    })
-    .catch(() => showPanelError(form, 'Unable to send verification code.'))
-    .finally(() => toggleSubmitState(form, false));
+    // Email OTP flow removed: guide users to sign up or sign in instead
+    showPanelMessage(form, 'Email verification during registration has been removed. Use Google or create an account instead.');
+    toggleSubmitState(form, false);
 }
-
-function submitEmailOtp(event) {
-    event.preventDefault();
-    const form = event.target;
-    toggleSubmitState(form, true);
-    hidePanelErrors(form);
-
-    const email = form.email.value.trim();
-    const otp = form.otp.value.trim();
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    fetch('/api/auth/email-otp/verify', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-        },
-        body: JSON.stringify({ email, otp }),
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            window.location.href = result.redirect || '/dashboard';
-        } else {
-            showPanelError(form, result.message, result.errors);
-        }
-    })
-    .catch(() => showPanelError(form, 'Unable to verify code.'))
-    .finally(() => toggleSubmitState(form, false));
-}
+// Email OTP verification removed from client-side.
 
 function toggleSubmitState(form, active) {
     const button = form.querySelector('button[type="submit"]');

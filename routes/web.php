@@ -57,15 +57,10 @@ Route::prefix('api/auth')->group(function () {
     Route::post('/otp/verify', [AuthController::class, 'verifyPhoneOtp']);
     Route::post('/email-otp/request', [AuthController::class, 'requestEmailOtp']);
     Route::post('/email-otp/verify', [AuthController::class, 'verifyEmailOtp']);
-    Route::post('/google/otp/send', [AuthController::class, 'sendGoogleOtp']);
-    Route::post('/google/otp/verify', [AuthController::class, 'verifyGoogleOtp']);
     Route::post('/google/profile/complete', [AuthController::class, 'completeGoogleProfile']);
     Route::post('/password-reset/request', [AuthController::class, 'requestPasswordReset']);
     Route::post('/password-reset/verify', [AuthController::class, 'verifyPasswordReset']);
     Route::post('/password-reset/complete', [AuthController::class, 'completePasswordReset']);
-    Route::post('/gmail/start', [AuthController::class, 'startGmailRegistration']);
-    Route::post('/gmail/verify', [AuthController::class, 'verifyGmailRegistration']);
-    Route::post('/gmail/complete', [AuthController::class, 'completeGmailRegistration']);
     Route::post('/phone/firebase-verify', [AuthController::class, 'verifyFirebaseToken']);
     Route::get('/user', [AuthController::class, 'getUser'])->middleware('auth');
     Route::get('/user/avatar', [AuthController::class, 'getAvatar'])->middleware('auth')->name('user.avatar');

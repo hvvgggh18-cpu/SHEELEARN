@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Laravel\Socialite\Facades\Socialite;
@@ -198,7 +199,6 @@ class AuthController extends Controller
                 'avatar' => $googleUser->getAvatar(),
                 'email_verified' => true,
             ]);
-            $request->session()->forget('google_registration_verified');
 
             if ($existingUser) {
                 $existingUser->provider_name = 'google';
@@ -212,161 +212,13 @@ class AuthController extends Controller
                 return redirect('/dashboard');
             }
 
-            return redirect('/')->with('google_registration_ready', true);
+            return redirect('/');
         } catch (\Exception $e) {
             \Log::error('Google auth callback error: ' . $e->getMessage());
             return response()->json([
         'message' => $e->getMessage(),
         'trace' => $e->getTraceAsString(),
     ]);
-        }
-    }
-
-    /**
-     * Send an OTP after Google account selection for the new Google-first onboarding flow.
-     */
-    public function sendGoogleOtp(Request $request)
-    {
-        try {
-            $registration = $request->session()->get('google_registration');
-            if (empty($registration['email'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Google account selection is required before verification.',
-                ], 422);
-            }
-
-            $email = strtolower($registration['email']);
-            $name = trim($registration['name'] ?? '');
-            $otp = (string) random_int(100000, 999999);
-            $expiresAt = now()->addMinutes(10);
-
-            // Rate limit: do not allow more than 3 requests in 10 minutes for the same email
-            $recent = \App\Models\EmailOtp::where('email', $email)
-                ->where('created_at', '>=', now()->subMinutes(10))
-                ->count();
-            if ($recent >= 3) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Too many verification requests. Please try again later.',
-                ], 429);
-            }
-
-            \App\Models\EmailOtp::updateOrCreate(
-                ['email' => $email],
-                [
-                    'name' => $name,
-                    'otp_hash' => Hash::make($otp),
-                    'attempt_count' => 0,
-                    'expires_at' => $expiresAt,
-                ]
-            );
-
-            // Send OTP via email
-            try {
-                Mail::raw(
-                    "Your SHEELEARN verification code is: {$otp}\n\nThis code will expire in 10 minutes. Do not share this code with anyone.",
-                    function ($message) use ($email, $name) {
-                        $message->to($email);
-                        $message->subject('Your SHEELEARN Verification Code');
-                        $message->from(config('mail.from.address'), config('mail.from.name'));
-                    }
-                );
-            } catch (\Exception $e) {
-
-    \Log::error('Google OTP email send failed.', [
-        'email' => $email,
-        'error' => $e->getMessage(),
-        'trace' => $e->getTraceAsString(),
-    ]);
-
-    return response()->json([
-        'success' => false,
-        'message' => $e->getMessage(),
-    ], 500);
-}
-
-            return response()->json([
-                'success' => true,
-                'message' => 'We\'ve sent a 6-digit verification code to your Gmail address.',
-            ], 200);
-        } catch (\Exception $e) {
-            \Log::error('Google OTP send error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to send verification code. Please try again later.',
-            ], 500);
-        }
-    }
-
-    /**
-     * Verify the Google OTP and move the user into the profile-completion step.
-     */
-    public function verifyGoogleOtp(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'otp' => ['required', 'digits:6'],
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid verification code format.',
-                    'errors' => $validator->errors(),
-                ], 422);
-            }
-
-            $registration = $request->session()->get('google_registration');
-            $email = strtolower($registration['email'] ?? '');
-            $emailOtp = $email ? \App\Models\EmailOtp::where('email', $email)->first() : null;
-
-            if (!$emailOtp || !$emailOtp->otp_hash) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No verification code found. Please request a new one.',
-                ], 422);
-            }
-
-            if ($emailOtp->expires_at->isPast()) {
-                $emailOtp->delete();
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Verification code has expired. Please request a new one.',
-                ], 422);
-            }
-
-            if (!Hash::check($request->otp, $emailOtp->otp_hash)) {
-                $emailOtp->attempt_count = ($emailOtp->attempt_count ?? 0) + 1;
-                if ($emailOtp->attempt_count >= 5) {
-                    $emailOtp->delete();
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Too many failed attempts. Please request a new verification code.',
-                    ], 429);
-                }
-                $emailOtp->save();
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Incorrect verification code. Please try again.',
-                ], 422);
-            }
-
-            $emailOtp->delete();
-            $request->session()->put('google_registration_verified', true);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Email verified successfully.',
-                'next_step' => 'profile',
-            ], 200);
-        } catch (\Exception $e) {
-            \Log::error('Google OTP verify error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to verify your code. Please try again later.',
-            ], 500);
         }
     }
 
@@ -398,11 +250,10 @@ class AuthController extends Controller
             }
 
             $registration = $request->session()->get('google_registration');
-            $verified = $request->session()->get('google_registration_verified');
-            if (empty($registration['email']) || !$verified) {
+            if (empty($registration['email'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Please verify your email before creating an account.',
+                    'message' => 'Google account information is missing. Please try again.',
                 ], 422);
             }
 
@@ -442,7 +293,7 @@ class AuthController extends Controller
                     $existingUser->save();
                     Auth::login($existingUser, true);
 
-                    $request->session()->forget(['google_registration', 'google_registration_verified']);
+                    $request->session()->forget('google_registration');
 
                     return response()->json([
                         'success' => true,
@@ -455,7 +306,7 @@ class AuthController extends Controller
                 $user = User::create($userData);
 
                 Auth::login($user, true);
-                $request->session()->forget(['google_registration', 'google_registration_verified']);
+                $request->session()->forget('google_registration');
 
                 return response()->json([
                     'success' => true,
@@ -644,28 +495,27 @@ class AuthController extends Controller
             $email = strtolower($request->email);
             $name = trim($request->name ?? '');
             $otp = (string) random_int(100000, 999999);
-            $expiresAt = now()->addMinutes(5);
+            $expiresAt = now()->addMinutes(5)->timestamp;
+            $cacheKey = 'email_registration_otp:' . $email;
 
-            // Rate limit: do not allow more than 3 requests in 10 minutes for the same email
-            $recent = \App\Models\EmailOtp::where('email', $email)
-                ->where('created_at', '>=', now()->subMinutes(10))
-                ->count();
-            if ($recent >= 3) {
+            $existing = Cache::get($cacheKey);
+            if ($existing && isset($existing['request_count']) && $existing['request_count'] >= 3 && now()->timestamp < $existing['rate_expires_at']) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Too many OTP requests. Please try again later.'
                 ], 429);
             }
 
-            $emailOtp = \App\Models\EmailOtp::updateOrCreate(
-                ['email' => $email],
-                [
-                    'name' => $name,
-                    'otp_hash' => Hash::make($otp),
-                    'attempt_count' => 0,
-                    'expires_at' => $expiresAt,
-                ]
-            );
+            $data = [
+                'name' => $name,
+                'otp_hash' => Hash::make($otp),
+                'attempt_count' => 0,
+                'expires_at' => $expiresAt,
+                'request_count' => ($existing['request_count'] ?? 0) + 1,
+                'rate_expires_at' => now()->addMinutes(10)->timestamp,
+            ];
+
+            Cache::put($cacheKey, $data, now()->addMinutes(10));
 
             $sentViaMail = false;
             $debugMode = config('app.debug') || app()->isLocal();
@@ -734,37 +584,35 @@ class AuthController extends Controller
             }
 
             $otp = (string) random_int(100000, 999999);
-            $expiresAt = now()->addMinutes(10);
+            $expiresAt = now()->addMinutes(10)->timestamp;
+            $cacheKey = 'password_reset_otp:' . $email;
 
-            // Prevent too-frequent resends: at least 60s between sends
-            $existing = \App\Models\EmailOtp::where('email', $email)->first();
-            if ($existing && $existing->created_at && $existing->created_at->gt(now()->subSeconds(60))) {
+            $existing = Cache::get($cacheKey);
+            if ($existing && isset($existing['last_sent_at']) && now()->timestamp < $existing['last_sent_at'] + 60) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Please wait before requesting a new code.'
                 ], 429);
             }
 
-            // Rate limit overall recent requests
-            $recent = \App\Models\EmailOtp::where('email', $email)
-                ->where('created_at', '>=', now()->subMinutes(10))
-                ->count();
-            if ($recent >= 6) {
+            if ($existing && isset($existing['request_count']) && $existing['request_count'] >= 6 && now()->timestamp < $existing['rate_expires_at']) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Too many verification requests. Please try again later.'
                 ], 429);
             }
 
-            \App\Models\EmailOtp::updateOrCreate(
-                ['email' => $email],
-                [
-                    'name' => $user->name ?? null,
-                    'otp_hash' => Hash::make($otp),
-                    'attempt_count' => 0,
-                    'expires_at' => $expiresAt,
-                ]
-            );
+            $data = [
+                'name' => $user->name ?? null,
+                'otp_hash' => Hash::make($otp),
+                'attempt_count' => 0,
+                'expires_at' => $expiresAt,
+                'last_sent_at' => now()->timestamp,
+                'request_count' => ($existing['request_count'] ?? 0) + 1,
+                'rate_expires_at' => now()->addMinutes(10)->timestamp,
+            ];
+
+            Cache::put($cacheKey, $data, now()->addMinutes(10));
 
             try {
                 Mail::raw("Your SHEELEARN password reset verification code is: {$otp}\n\nThis code will expire in 10 minutes.", function ($message) use ($email) {
@@ -812,25 +660,28 @@ class AuthController extends Controller
             }
 
             $email = strtolower($request->email);
-            $emailOtp = \App\Models\EmailOtp::where('email', $email)->first();
+            $cacheKey = 'password_reset_otp:' . $email;
+            $emailOtp = Cache::get($cacheKey);
 
-            if (!$emailOtp || !$emailOtp->otp_hash || $emailOtp->expires_at->isPast()) {
+            if (!$emailOtp || empty($emailOtp['otp_hash']) || now()->timestamp >= ($emailOtp['expires_at'] ?? 0)) {
+                Cache::forget($cacheKey);
                 return response()->json([
                     'success' => false,
                     'message' => 'Verification code expired or invalid. Please request a new code.'
                 ], 422);
             }
 
-            if (!Hash::check($request->otp, $emailOtp->otp_hash)) {
-                $emailOtp->attempt_count = ($emailOtp->attempt_count ?? 0) + 1;
-                if ($emailOtp->attempt_count >= 5) {
-                    $emailOtp->delete();
+            if (!Hash::check($request->otp, $emailOtp['otp_hash'])) {
+                $emailOtp['attempt_count'] = ($emailOtp['attempt_count'] ?? 0) + 1;
+                if ($emailOtp['attempt_count'] >= 5) {
+                    Cache::forget($cacheKey);
                     return response()->json([
                         'success' => false,
                         'message' => 'Too many failed attempts. Please request a new verification code.'
                     ], 429);
                 }
-                $emailOtp->save();
+
+                Cache::put($cacheKey, $emailOtp, now()->addSeconds(max(1, $emailOtp['expires_at'] - now()->timestamp)));
 
                 return response()->json([
                     'success' => false,
@@ -838,8 +689,7 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            // Valid: consume OTP and mark session for password reset
-            $emailOtp->delete();
+            Cache::forget($cacheKey);
             $request->session()->put('password_reset_email', $email);
             $request->session()->put('password_reset_verified', true);
 
@@ -945,25 +795,28 @@ class AuthController extends Controller
             }
 
             $email = strtolower($request->email);
-            $emailOtp = \App\Models\EmailOtp::where('email', $email)->first();
+            $cacheKey = 'email_registration_otp:' . $email;
+            $emailOtp = Cache::get($cacheKey);
 
-            if (!$emailOtp || !$emailOtp->otp_hash || $emailOtp->expires_at->isPast()) {
+            if (!$emailOtp || empty($emailOtp['otp_hash']) || now()->timestamp >= ($emailOtp['expires_at'] ?? 0)) {
+                Cache::forget($cacheKey);
                 return response()->json([
                     'success' => false,
                     'message' => 'Verification code expired or invalid. Please request a new code.'
                 ], 422);
             }
 
-            if (!Hash::check($request->otp, $emailOtp->otp_hash)) {
-                $emailOtp->attempt_count = ($emailOtp->attempt_count ?? 0) + 1;
-                if ($emailOtp->attempt_count >= 5) {
-                    $emailOtp->delete();
+            if (!Hash::check($request->otp, $emailOtp['otp_hash'])) {
+                $emailOtp['attempt_count'] = ($emailOtp['attempt_count'] ?? 0) + 1;
+                if ($emailOtp['attempt_count'] >= 5) {
+                    Cache::forget($cacheKey);
                     return response()->json([
                         'success' => false,
                         'message' => 'Too many failed attempts. Please request a new code.'
                     ], 429);
                 }
-                $emailOtp->save();
+
+                Cache::put($cacheKey, $emailOtp, now()->addSeconds(max(1, $emailOtp['expires_at'] - now()->timestamp)));
 
                 return response()->json([
                     'success' => false,
@@ -971,9 +824,8 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            // capture name and consume record
-            $requestedName = $emailOtp->name ?? null;
-            $emailOtp->delete();
+            $requestedName = $emailOtp['name'] ?? null;
+            Cache::forget($cacheKey);
 
             $user = User::where('email', $email)->first();
             if (!$user) {
