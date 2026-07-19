@@ -273,15 +273,18 @@ class AuthController extends Controller
                     }
                 );
             } catch (\Exception $e) {
-                \Log::error('Google OTP email send failed.', [
-                    'email' => $email,
-                    'error' => $e->getMessage(),
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to send verification email. Please try again later.',
-                ], 500);
-            }
+
+    \Log::error('Google OTP email send failed.', [
+        'email' => $email,
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString(),
+    ]);
+
+    return response()->json([
+        'success' => false,
+        'message' => $e->getMessage(),
+    ], 500);
+}
 
             return response()->json([
                 'success' => true,

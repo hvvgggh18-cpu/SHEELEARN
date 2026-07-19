@@ -37,19 +37,25 @@ return [
 
     'mailers' => [
 
-        'smtp' => [
+'smtp' => [
     'transport' => 'smtp',
     'scheme' => env('MAIL_SCHEME'),
-    'url' => env('MAIL_URL'),
-    'host' => env('MAIL_HOST', '127.0.0.1'),
-    'port' => env('MAIL_PORT', 587),
-    'encryption' => env('MAIL_ENCRYPTION'),
+
+    'host' => env('MAIL_HOST'),
+
+    'port' => env('MAIL_PORT'),
+
     'username' => env('MAIL_USERNAME'),
+
     'password' => env('MAIL_PASSWORD'),
+
+    'encryption' => env('MAIL_ENCRYPTION'),
+
     'timeout' => 30,
+
     'local_domain' => env(
         'MAIL_EHLO_DOMAIN',
-        parse_url((string) env('APP_URL', 'https://sheelearn.onrender.com'), PHP_URL_HOST)
+        parse_url(env('APP_URL'), PHP_URL_HOST)
     ),
 ],
 
