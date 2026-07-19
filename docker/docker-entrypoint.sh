@@ -30,6 +30,15 @@ if [ -f composer.json ]; then
   fi
 fi
 
+# Clear and rebuild Laravel caches so runtime env vars are loaded correctly
+if [ -f artisan ]; then
+  php artisan config:clear || true
+  php artisan route:clear || true
+  php artisan view:clear || true
+  php artisan config:cache || true
+  php artisan route:cache || true
+fi
+
 # Optionally run migrations
 if [ "${RUN_MIGRATIONS}" = "true" ] && [ -f artisan ]; then
   php artisan migrate --force || true

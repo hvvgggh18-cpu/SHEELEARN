@@ -174,14 +174,18 @@ class AuthController extends Controller
                 return redirect('/login')->with('error', 'Google did not provide an email address.');
             }
 
-            $query = User::query();
+            $existingUser = null;
 
             if (Schema::hasColumn('users', 'provider_name') && Schema::hasColumn('users', 'provider_id')) {
-                $query = User::where('provider_name', 'google')
-                    ->where('provider_id', $googleUser->getId());
+                try {
+                    $existingUser = User::where('provider_name', 'google')
+                        ->where('provider_id', $googleUser->getId())
+                        ->first();
+                } catch (\Throwable $e) {
+                    \Log::warning('Google provider lookup failed, falling back to email', ['error' => $e->getMessage()]);
+                    $existingUser = null;
+                }
             }
-
-            $existingUser = $query->first();
 
             if (!$existingUser) {
                 $existingUser = User::where('email', $googleUser->getEmail())->first();
