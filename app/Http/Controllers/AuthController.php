@@ -215,7 +215,10 @@ class AuthController extends Controller
             return redirect('/')->with('google_registration_ready', true);
         } catch (\Exception $e) {
             \Log::error('Google auth callback error: ' . $e->getMessage());
-            return redirect('/login')->with('error', 'Unable to sign in with Google. Please try again later.');
+            return response()->json([
+        'message' => $e->getMessage(),
+        'trace' => $e->getTraceAsString(),
+    ]);
         }
     }
 
